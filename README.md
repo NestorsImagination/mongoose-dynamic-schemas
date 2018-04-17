@@ -1,7 +1,7 @@
 # Mongoose Dynamic Schemas
 A lightweight module which allows to dynamically add, remove, move and redefine schema fields of [Mongoose](http://mongoosejs.com/) models. Useful when you need a model to be flexible but still want it to conform to a well defined schema.
 
-[![npm](https://img.shields.io/badge/npm-v1.0.0-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
+[![npm](https://img.shields.io/badge/npn-v1.1.1-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
 
 ## Requeriments
 
@@ -51,7 +51,7 @@ Arguments:
 * model: The Mongoose model.
 * path (string): The path of the field to remove (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
  
- ### Moving/renaming a field
+ ### Moving or renaming a field
 
 You can move or rename a field with this function:
 
