@@ -1,7 +1,7 @@
 # Mongoose Dynamic Schemas
 A lightweight module which allows to dynamically add, remove, move and redefine schema fields of [Mongoose](http://mongoosejs.com/) models. Useful when you need a model to be flexible but still want it to conform to a well defined schema.
 
-[![npm](https://img.shields.io/badge/npn-v1.1.1-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
+[![npm](https://img.shields.io/badge/npn-v1.1.2-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
 
 ## Requeriments
 
@@ -51,7 +51,7 @@ Arguments:
 * model: The Mongoose model.
 * path (string): The path of the field to remove (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
  
- ### Moving or renaming a field
+### Moving or renaming a field
 
 You can move or rename a field with this function:
 
@@ -67,29 +67,29 @@ Arguments:
 * origin (string): The path of the field to move (sucessive fields separated with points, even when a nested field is inside an array/subdocument). It must point to an existing field.
 * dest (string): The destination path of the field to move (sucessive fields separated with points, even when a nested field is inside an array/subdocument). It cannot point to an existing field.
 
- ### Changing a field's definition
+### Changing a field's definition
  
- You can change a field's definition with this function:
+You can change a field's definition with this function:
  
- ```javascript
- changeFieldDefinition(model, path, newDefinition)
- ```
+```javascript
+changeFieldDefinition(model, path, newDefinition)
+```
  
- Arguments:
+Arguments:
 
 * model: The Mongoose model.
 * path (string): The path to the field whose definition will be changed (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
 * newDefinition (object): The new definition of the field (same structure as standard Mongoose schema field definitions).
 
- ### Changing a field's type
- 
- An alternative function to changeFieldDefinition is provided in order to simplify its call, although its more limited:
- 
- ```javascript
- changeFieldType(model, path, newType, defaultValue, required)
- ```
- 
- Arguments:
+### Changing a field's type
+
+An alternative function to changeFieldDefinition is provided in order to simplify its call, although its more limited:
+
+```javascript
+changeFieldType(model, path, newType, defaultValue, required)
+```
+
+Arguments:
 
 * model: The Mongoose model.
 * path (string): The path to the field whose type will be changed (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
@@ -342,7 +342,7 @@ Now we move some fields. Remember that you cannot move a field between different
     c : <...>
   }],
   d : <...>
- }
+}
 ```
 
 You would be allowed to do theese:
