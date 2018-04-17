@@ -1,0 +1,30 @@
+{
+  "name": "mongoose-dynamic-schemas",
+  "version": "1.0.0",
+  "description": "A lightweight module which allows to dynamically add, remove, move and redefine schema fields of Mongoose models.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NestorsImagination/mongoose-dynamic-schemas.git"
+  },
+  "keywords": [
+    "Mongoose",
+    "Node.js",
+    "Schema",
+    "Model",
+    "MongoDB",
+    "Javascript"
+  ],
+  "author": "Daniel Pérez Gázquez Plenidag@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NestorsImagination/mongoose-dynamic-schemas/issues"
+  },
+  "homepage": "https://github.com/NestorsImagination/mongoose-dynamic-schemas#readme",
+  "dependencies": {
+    "object-path": "^0.11.4"
+  }
+}
