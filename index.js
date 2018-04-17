@@ -6,12 +6,12 @@ const objectPath = require("object-path");
  * Adds the given field to the Mongoose model at the end of the path.
  * @param {object} model The Mongoose model.
  * @param {string} path The path where the field will be added (sucessive fields separated with points, even when a 
- * nested field is inside an array/subdocument)
+ * nested field is inside an array/subdocument). The path can't point to an existing field.
  * @param {object} fieldDefinition The definition of the field to add, including options and other nested fields or
  * arrays/subdocuments.
- * @returns {Promise} Results of the operation.
+ * @returns {Promise.<string, string>} Results of the operation.
  */
-function addSchemaField(model, path, fieldDefinition, callback) {
+function addSchemaField(model, path, fieldDefinition) {
 	return new Promise(function (resolve, reject) {
 		var lastSchemaAndPaths = getLastSchemaAndPaths(model.schema, path);
 
@@ -37,10 +37,10 @@ function addSchemaField(model, path, fieldDefinition, callback) {
  * Removes the field of the Mongoose model at the end of the path.
  * @param {object} model The Mongoose model.
  * @param {string} path The path of the field to remove (sucessive fields separated with points, even when a nested 
- * field is inside an array/subdocument).
- * @returns {Promise} Results of the operation.
+ * field is inside an array/subdocument). The path must point to an existing field.
+ * @returns {Promise.<string, string>} Results of the operation.
  */
-function removeSchemaField(model, path, callback) {
+function removeSchemaField(model, path) {
 	return new Promise(function (resolve, reject) {
 		var lastSchemaAndPaths = getLastSchemaAndPaths(model.schema, path);
 
@@ -48,7 +48,7 @@ function removeSchemaField(model, path, callback) {
 			reject("The field to remove does not exists (" + path + ")");
 		} else {
 			var unsetQuery = {};
-			unsetQuery[lastSchemaAndPaths.fullPath] = 1;
+			unsetQuery[lastSchemaAndPaths.pathToLastQuery] = 1;
 
 			var updateQuery = {};
 			if (lastSchemaAndPaths.pathToLast != "")
@@ -56,10 +56,12 @@ function removeSchemaField(model, path, callback) {
 
 			model.update(updateQuery, { $unset: unsetQuery }, { multi: true, upsert: false })
 			.then(function () {
-				model.schema.remove(lastSchemaAndPaths.fullPath);
+				model.schema.remove(lastSchemaAndPaths.pathToLastQuery);
 				lastSchemaAndPaths.schema.remove(lastSchemaAndPaths.path);
 
-				for (var currentSchema = model.schema; lastSchemaAndPaths.subPaths.length > 1; currentSchema = currentSchema.path(lastSchemaAndPaths.subPaths[0]).schema, lastSchemaAndPaths.subPaths.shift()) {
+				for (var currentSchema = model.schema; lastSchemaAndPaths.subPaths.length > 1; 
+					currentSchema = currentSchema.path(lastSchemaAndPaths.subPaths[0]).schema, 
+					lastSchemaAndPaths.subPaths.shift()) {
 					objectPath.del (currentSchema.tree, lastSchemaAndPaths.subPaths.join('.0.'));
 				}
 
@@ -80,12 +82,12 @@ function removeSchemaField(model, path, callback) {
  * 
  * @param {object} model The Mongoose model.
  * @param {string} origin The path of the field to move (sucessive fields separated with points, even when a nested 
- * field is inside an array/subdocument).
+ * field is inside an array/subdocument). It must point to an existing field.
  * @param {string} dest The destination path of the field to move (sucessive fields separated with points, even 
- * when a nested field is inside an array/subdocument).
- * @returns {Promise} Results of the operation.
+ * when a nested field is inside an array/subdocument). It cannot point to an existing field.
+ * @returns {Promise.<string, string>} Results of the operation.
  */
-function moveSchemaField(model, origin, dest, callback) {
+function moveSchemaField(model, origin, dest) {
 	return new Promise(function (resolve, reject) {
 		var lastSchemaAndPathsOrigin = getLastSchemaAndPaths(model.schema, origin);
 		var lastSchemaAndPathsDest = getLastSchemaAndPaths(model.schema, dest);
@@ -145,10 +147,10 @@ function moveSchemaField(model, origin, dest, callback) {
  * 
  * @param {object} model The Mongoose model.
  * @param {string} path The path to the field whose definition will be changed (sucessive fields separated with points, 
- * even when a nested field is inside an array/subdocument).
+ * even when a nested field is inside an array/subdocument). The path must point to an existing field.
  * @param {object} newDefinition The new definition of the field (same structure as standard Mongoose schema field 
  * definitions).
- * @returns {Promise} Results of the operation.
+ * @returns {Promise.<string, string>} Results of the operation.
  */
 function changeFieldDefinition(model, path, newDefinition) {
 	return new Promise(function (resolve, reject) {
@@ -171,13 +173,13 @@ function changeFieldDefinition(model, path, newDefinition) {
 /**
  * Alternative function to change a field's type, more limited than changeFieldDefinition.
  * 
- * @param {*} model The Mongoose model.
- * @param {*} path The path of the field whose type will be changed (sucessive fields separated with points, even when a 
+ * @param {object} model The Mongoose model.
+ * @param {string} path The path of the field whose type will be changed (sucessive fields separated with points, even when a 
  * nested field is inside an array/subdocument).
- * @param {*} newType The new type of the field (String, Number...).
- * @param {*} defaultValue The default value of the field. If undefined, no default value will be defined for the field.
- * @param {*} required If the field is required or not. If undefined, it will be tagged as not required.
- * @returns {Promise} Results of the operation.
+ * @param {object} newType The new type of the field (String, Number...).
+ * @param {string} defaultValue The default value of the field. If undefined, no default value will be defined for the field.
+ * @param {boolean} required If the field is required or not. If undefined, it will be tagged as not required.
+ * @returns {Promise.<string, string>} Results of the operation.
  */
 function changeFieldType(model, path, newType, defaultValue, required) {
 	return new Promise(function (resolve, reject) {
@@ -216,7 +218,7 @@ function changeFieldType(model, path, newType, defaultValue, required) {
  * level, doing this for all instances of that field in the case it is contained inside one or multiple arrays.
  * 
  * @param {object} doc The document.
- * @param {array} subPaths Subpaths that point to the field whose value will be moved.
+ * @param {string[]} subPaths Subpaths that point to the field whose value will be moved.
  * @param {string} lastDestPath Path inside the same subdocument level of the other field where the value will be moved.
  */
 function moveForAllSubdocuments(doc, subPaths, lastDestPath) {
@@ -224,12 +226,12 @@ function moveForAllSubdocuments(doc, subPaths, lastDestPath) {
 }
 
 /**
- * Recursive function used by moveForAllSubdocuments.
+ * Auxiliary function for moveForAllSubdocuments.
  * 
  * @param {object} doc The document.
- * @param {array} subPaths Subpaths that point to the field whose value will be moved.
+ * @param {string[]} subPaths Subpaths that point to the field whose value will be moved.
  * @param {string} lastDestPath Path inside the same subdocument level of the other field where the value will be moved.
- * @param {Number} currentPathIndex The current index of the subdocument levels to explore.
+ * @param {number} currentPathIndex The current index of the subdocument levels to explore.
  */
 function moveForAllSubdocumentsRecursive(doc, subPaths, lastDestPath, currentPathIndex) {
 	if (currentPathIndex == (subPaths.length - 1)) {
@@ -247,13 +249,14 @@ function moveForAllSubdocumentsRecursive(doc, subPaths, lastDestPath, currentPat
  * - exists: If the path points to an existing field.
  * - schema: The schema of the subdocument the path is pointing to.
  * - path: The path to the pointed location inside its own subdocument.
- * - fullPath: The full path, where a ".$[]" symbol has been added for each array found (useful for queries).
+ * - pathToLastQuery: The path that points to the last array found, the subdocument level where the given path points to.
+ *   A ".$[]" symbol is added in each array position so it to be used in queries (requires MongoDB 3.6+).
  * - pathToLast: The path that points to the last array found, the subdocument level where the given path points to.
  * - subPaths: Array of paths, where each subpath points to the next array or, for the last subpath, to the location the
- * given path points inside its own subdocument.
+ * given path points to inside its own subdocument.
  * 
- * @param {*} schema The schema to explore.
- * @param {*} path The path to the field.
+ * @param {object} schema The schema to explore.
+ * @param {string} path The path to the field.
  * @returns {object} Object containing all the utility data.
  */
 function getLastSchemaAndPaths(schema, path) {
@@ -261,22 +264,16 @@ function getLastSchemaAndPaths(schema, path) {
 }
 
 /**
- * Returns an object containing useful information given an schema and a path. The fields contained are:
+ * Auxiliary function for getLastSchemaAndPaths.
  * 
- * - exists: If the path points to an existing field.
- * - schema: The schema of the subdocument the path is pointing to.
- * - path: The path to the pointed location inside its own subdocument.
- * - fullPath: The full path, where a ".$[]" symbol has been added for each array found (useful for queries).
- * - pathToLast: The path that points to the last array found, the subdocument level where the given path points to.
- * 
- * @param {*} schema The schema to explore.
- * @param {*} path The path to the field.
- * @param {*} currentPathIndex The current index of the subpaths to explore.
- * @param {*} currentFullPath The current full path.
- * @param {*} subPaths The array of subpaths. 
+ * @param {object} schema The schema to explore.
+ * @param {string} path The path to the field.
+ * @param {number} currentPathIndex The current index of the subpaths to explore.
+ * @param {string} currentPathToLastQuery The current full path.
+ * @param {array} subPaths The array of subpaths. 
  * @returns {object} Object containing all the utility data.
  */
-function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, currentFullPath, subPaths) {
+function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, currentPathToLastQuery, subPaths) {
 	var currentPath = path[currentPathIndex];
 
 	if (currentPathIndex != path.length) {
@@ -306,8 +303,8 @@ function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, c
 			exists: exists, 
 			schema: currentSchema,
 			path: currentPath, 
-			fullPath: ((currentFullPath !== "") ? (currentFullPath + "." + currentPath) : currentPath), 
-			pathToLast: currentFullPath.replace(".$[]", ""), 
+			pathToLastQuery: ((currentPathToLastQuery !== "") ? (currentPathToLastQuery + "." + currentPath) : currentPath), 
+			pathToLast: currentPathToLastQuery.replace(".$[]", ""), 
 			subPaths : subPaths
 		};
 	}
