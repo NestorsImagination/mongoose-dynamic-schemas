@@ -39,9 +39,9 @@ addSchemaField(model, path, fieldDefinition)
 ```
 
 Arguments:
-* model: The Mongoose model.
-* path (string): The path where the field will be added (sucessive fields separated with points, even when a nested field is inside an array). The path can't point to an existing field.
-* fieldDefinition (object): The definition of the field to add, including options and other nested fields or arrays.
+* **model**: The Mongoose model.
+* **path (string)**: The path where the field will be added (sucessive fields separated with points, even when a nested field is inside an array). The path can't point to an existing field.
+* **fieldDefinition (object)**: The definition of the field to add, including options and other nested fields or arrays.
 
 ### Removing a field
 
@@ -53,9 +53,9 @@ removeSchemaField(model, path, removeSubdocumentIfEmpty = false)
 
 Arguments:
 
-* model: The Mongoose model.
-* path (string): The path of the field to remove (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
-* removeSubdocumentIfEmpty (boolean): Whether to remove the subdocument containing the field to remove if it gets empty (when applicable). For example, if you have the next structure:
+* **model**: The Mongoose model.
+* **path (string)**: The path of the field to remove (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
+* **removeSubdocumentIfEmpty (boolean)**: Whether to remove the subdocument containing the field to remove if it gets empty (when applicable). For example, if you have the next structure:
 
 ```javascript
 {
@@ -65,7 +65,7 @@ Arguments:
 }
 ```
 
-And you remove 'a.b', if removeSubdocumentIfEmpty is false the next structure would remain:
+And you remove 'a.b', if **removeSubdocumentIfEmpty** is false the next structure would remain:
 
 ```javascript
 {
@@ -73,7 +73,7 @@ And you remove 'a.b', if removeSubdocumentIfEmpty is false the next structure wo
 }
 ```
 
-If removeSubdocumentIfEmpty is true, the field 'a' would be also removed.
+If **removeSubdocumentIfEmpty** is true, the field 'a' would be also removed.
  
 ### Moving or renaming a field
 
@@ -87,10 +87,10 @@ The origin path must point to an existing field. The destination path must point
 
 Arguments:
 
-* model: The Mongoose model.
-* origin (string): The path of the field to move (sucessive fields separated with points, even when a nested field is inside an array). It must point to an existing field.
-* dest (string): The destination path of the field to move (sucessive fields separated with points, even when a nested field is inside an array). It cannot point to an existing field.
-* removeSubdocumentIfEmpty (boolean): Same function as the field with the same name of the removeSchemaField method.
+* **model**: The Mongoose model.
+* **origin (string)**: The path of the field to move (sucessive fields separated with points, even when a nested field is inside an array). It must point to an existing field.
+* **dest (string)**: The destination path of the field to move (sucessive fields separated with points, even when a nested field is inside an array). It cannot point to an existing field.
+* **removeSubdocumentIfEmpty (boolean)**: Same function as the field with the same name of the removeSchemaField method.
 
 ### Changing a field's definition
  
@@ -102,13 +102,13 @@ changeFieldDefinition(model, path, newDefinition, )
  
 Arguments:
 
-* model: The Mongoose model.
-* path (string): The path to the field whose definition will be changed (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
-* newDefinition (object): The new definition of the field (same structure as standard Mongoose schema field definitions).
+* **model**: The Mongoose model.
+* **path (string)**: The path to the field whose definition will be changed (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
+* **newDefinition (object)**: The new definition of the field (same structure as standard Mongoose schema field definitions).
 
 ### Changing a field's type
 
-An alternative function to changeFieldDefinition:
+An alternative function to **changeFieldDefinition**:
 
 ```javascript
 changeFieldType(model, path, newType, defaultValue, required = false, keepValues = false)
@@ -116,12 +116,12 @@ changeFieldType(model, path, newType, defaultValue, required = false, keepValues
 
 Arguments:
 
-* model: The Mongoose model.
-* path (string): The path to the field whose type will be changed (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
-* newType (Type): The new type of the field (String, Number...).
-* defaultValue: The default value of the field. If undefined, no default value will be defined for the field.
-* required: If the field is required or not.
-* keepValues: Whether to keep the previous values of the field or not. Only mark it as true if changing between compatible types and values (eg. string and integer as long as all the values of that field in the existing documents represent numbers).
+* **model**: The Mongoose model.
+* **path (string)**: The path to the field whose type will be changed (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
+* **newType (Type)**: The new type of the field (String, Number...).
+* **defaultValue**: The default value of the field. If undefined, no default value will be defined for the field.
+* **required**: If the field is required or not.
+* **keepValues**: Whether to keep the previous values of the field or not. Only mark it as true if changing between compatible types and values (eg. string and integer as long as all the values of that field in the existing documents represent numbers).
 
 ## Example
 
@@ -301,7 +301,7 @@ Time to remove some fields:
 We add another dog and print the collection:
 
 ```javascript
-.then(result => new Dog({ name: 'Bimbo', family : 'Gazquez', color : 'Negro', stats : {power : 20 }}).save())
+.then(result => new Dog({ name: 'Bimbo', family : 'Gazquez', color : 'Black', stats : {power : 20 }}).save())
 .then(result => Dog.find({}).exec())
 .then(dogs => console.log("3 - "+util.inspect(dogs, false, null)))
 ```
@@ -347,7 +347,7 @@ Results:
     __v: 0 },
   { stats: { power: 20 },
     name: 'Bimbo',
-    color: 'Negro',
+    color: 'Black',
     breed: 'No breed',
     age: '5',
     children: 2,
@@ -440,7 +440,7 @@ Results:
          _id: 5ad667e31a8aa71c8ca64af2 } ],
     _id: 5ad667e31a8aa71c8ca64af1,
     __v: 1 },
-  { looks: { colour: 'Negro' },
+  { looks: { colour: 'Black' },
     name: 'Bimbo',
     breed: 'No breed',
     age: '5',
