@@ -1,6 +1,6 @@
 {
   "name": "mongoose-dynamic-schemas",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "A lightweight module which allows to dynamically add, remove, move and redefine schema fields of Mongoose models.",
   "main": "index.js",
   "scripts": {
