@@ -6,9 +6,9 @@ const objectPath = require("object-path");
  * Adds the given field to the Mongoose model at the end of the path.
  * @param {object} model The Mongoose model.
  * @param {string} path The path where the field will be added (sucessive fields separated with points, even when a 
- * nested field is inside an array/subdocument). The path can't point to an existing field.
- * @param {object} fieldDefinition The definition of the field to add, including options and other nested fields or
- * arrays/subdocuments.
+ * nested field is inside an array). The path can't point to an existing field.
+ * @param {object} fieldDefinition The definition of the field to add, including options and other nested fields,
+ * subdocuments or arrays.
  * @returns {Promise.<string, string>} Results of the operation.
  */
 function addSchemaField(model, path, fieldDefinition) {
@@ -18,18 +18,53 @@ function addSchemaField(model, path, fieldDefinition) {
 		if (lastSchemaAndPaths.exists) {
 			reject("The field to add already exists (" + path + ")");
 		} else {
-			var addQuery = {};
-			objectPath.set(addQuery, lastSchemaAndPaths.path, fieldDefinition);
+			// If the field is going to be added inside a field previously containing an empty subdocument ({}), this
+			// field must be removed before adding the new field in order to avoid errors
 
-			lastSchemaAndPaths.schema.add(addQuery);
+			var lastPaths = lastSchemaAndPaths.path.split('.');
+			if (lastPaths.length > 1) {
+				var fieldName = lastPaths.pop();
+				var previousField = objectPath.get (lastSchemaAndPaths.schema.tree, lastPaths.join('.'));
 
-			// Updates all the subdocument schema trees
-			for (var currentSchema = model.schema; lastSchemaAndPaths.subPaths.length > 1; currentSchema = currentSchema.path(lastSchemaAndPaths.subPaths[0]).schema, lastSchemaAndPaths.subPaths.shift()) {
-				objectPath.set (currentSchema.tree, lastSchemaAndPaths.subPaths.join('.0.'), fieldDefinition);
+				if (previousField != undefined && ((Object.keys(previousField).length === 0) || 
+					(previousField.type && (Object.keys(previousField.type).length === 0)))) {
+
+					removeSchemaField (model, lastSchemaAndPaths.pathToLast + lastPaths)
+					.then(() => addSchemaAux(model, lastSchemaAndPaths, fieldDefinition))
+					.then(() => resolve("Field added successfully"))
+					.catch(error => reject(error));
+				} else {
+					addSchemaAux(model, lastSchemaAndPaths, fieldDefinition)
+					.then(() => resolve("Field added successfully"))
+					.catch(error => reject(error));
+				}
+			} else {
+				addSchemaAux(model, lastSchemaAndPaths, fieldDefinition)
+				.then(() => resolve("Field added successfully"))
+				.catch(error => reject(error));
 			}
-
-			resolve("Field added successfully");
 		}
+	});
+}
+
+function addSchemaAux(model, lastSchemaAndPaths, fieldDefinition) {
+	return new Promise(function (resolve, reject) {
+		var addQuery = {};
+		objectPath.set(addQuery, lastSchemaAndPaths.path, fieldDefinition);
+
+		lastSchemaAndPaths.schema.add(addQuery);
+
+		// Updates all the array schema trees
+		for (var currentSchema = model.schema; lastSchemaAndPaths.subPaths.length > 1; 
+			currentSchema = currentSchema.path(lastSchemaAndPaths.subPaths[0]).schema, 
+			lastSchemaAndPaths.subPaths.shift()) {
+
+			objectPath.set (currentSchema.tree, lastSchemaAndPaths.subPaths.join('.0.'), fieldDefinition);
+		}
+
+		updateDefaults(model, lastSchemaAndPaths.subPaths[0])
+		.then(() => resolve("Field added successfully"))
+		.catch(error => reject(error));
 	});
 }
 
@@ -37,10 +72,12 @@ function addSchemaField(model, path, fieldDefinition) {
  * Removes the field of the Mongoose model at the end of the path.
  * @param {object} model The Mongoose model.
  * @param {string} path The path of the field to remove (sucessive fields separated with points, even when a nested 
- * field is inside an array/subdocument). The path must point to an existing field.
+ * field is inside an array). The path must point to an existing field.
+ * @param {boolean} removeSubdocumentIfEmpty Whether to remove the subdocument containing the field to remove if it gets 
+ * empty (when applicable).
  * @returns {Promise.<string, string>} Results of the operation.
  */
-function removeSchemaField(model, path) {
+function removeSchemaField(model, path, removeSubdocumentIfEmpty = false) {
 	return new Promise(function (resolve, reject) {
 		var lastSchemaAndPaths = getLastSchemaAndPaths(model.schema, path);
 
@@ -48,16 +85,19 @@ function removeSchemaField(model, path) {
 			reject("The field to remove does not exists (" + path + ")");
 		} else {
 			var unsetQuery = {};
-			unsetQuery[lastSchemaAndPaths.pathToLastQuery] = 1;
+			unsetQuery[lastSchemaAndPaths.fullPath] = 1;
 
 			var updateQuery = {};
 			if (lastSchemaAndPaths.pathToLast != "")
 				updateQuery[lastSchemaAndPaths.pathToLast] = { $gt: [] };
 
 			model.update(updateQuery, { $unset: unsetQuery }, { multi: true, upsert: false })
-			.then(function () {
-				model.schema.remove(lastSchemaAndPaths.pathToLastQuery);
+			.then(() => {
+				model.schema.remove(lastSchemaAndPaths.fullPath);
 				lastSchemaAndPaths.schema.remove(lastSchemaAndPaths.path);
+
+				// Removes the path from the subpaths if it is included (to avoid problems when updating later)
+				delete model.schema.subpaths[lastSchemaAndPaths.subPaths.join('.0.')];
 
 				for (var currentSchema = model.schema; lastSchemaAndPaths.subPaths.length > 1; 
 					currentSchema = currentSchema.path(lastSchemaAndPaths.subPaths[0]).schema, 
@@ -65,7 +105,22 @@ function removeSchemaField(model, path) {
 					objectPath.del (currentSchema.tree, lastSchemaAndPaths.subPaths.join('.0.'));
 				}
 
-				resolve("Field removed successfully");
+				if (removeSubdocumentIfEmpty) {
+					objectPath.del (lastSchemaAndPaths.schema.tree, lastSchemaAndPaths.path);
+
+					var lastPathArray = lastSchemaAndPaths.path.split('.');
+
+					if (lastPathArray.length > 1) {
+						lastPathArray.pop();
+						if (Object.keys(objectPath.get(lastSchemaAndPaths.schema.tree, 
+							lastPathArray.join('.'))).length === 0 ) {
+
+							removeSchemaField(model, (lastSchemaAndPaths.pathToLast === "") ? lastPathArray.join('.') : 
+								lastSchemaAndPaths.pathToLast+'.'+lastPathArray.join('.'))
+							.then(() => resolve("Field removed successfully"));
+						} else resolve("Field removed successfully");
+					} else resolve("Field removed successfully");
+				} else resolve("Field removed successfully");
 			})
 			.catch(error => reject(error));
 		}
@@ -76,18 +131,20 @@ function removeSchemaField(model, path) {
  * Moves (or renames) the field at the origin path to a new field at the destination path.
  * 
  * The origin path must point to an existing field. The destination path must point to a non existing field in the same
- * array/subdocument level of the field at the origin path.
+ * array level of the field at the origin path.
  * 
- * The new field will keep the values the original field had, even at subdocument levels.
+ * The new field will keep the values the original field had, even at sub-array levels.
  * 
  * @param {object} model The Mongoose model.
  * @param {string} origin The path of the field to move (sucessive fields separated with points, even when a nested 
- * field is inside an array/subdocument). It must point to an existing field.
+ * field is inside an array). It must point to an existing field.
  * @param {string} dest The destination path of the field to move (sucessive fields separated with points, even 
- * when a nested field is inside an array/subdocument). It cannot point to an existing field.
+ * when a nested field is inside an array). It cannot point to an existing field.
+ * @param {boolean} removeSubdocumentIfEmpty Whether to remove the subdocument containing the origin field if it gets 
+ * empty (when applicable).
  * @returns {Promise.<string, string>} Results of the operation.
  */
-function moveSchemaField(model, origin, dest) {
+function moveSchemaField(model, origin, dest, removeSubdocumentIfEmpty = false) {
 	return new Promise(function (resolve, reject) {
 		var lastSchemaAndPathsOrigin = getLastSchemaAndPaths(model.schema, origin);
 		var lastSchemaAndPathsDest = getLastSchemaAndPaths(model.schema, dest);
@@ -115,14 +172,14 @@ function moveSchemaField(model, origin, dest) {
 				);
 
 				addSchemaField(model, dest, fieldDefinition)
-				.then(result => model.find({}).exec())
-				.then(function (docs) {
+				.then(() => model.find({}).exec())
+				.then(docs => {
 					var numToUpdate = docs.length;
 					var numUpdated = 0;
 
 					docs.forEach(function (doc) {
-						moveForAllSubdocuments(doc, lastSchemaAndPathsOrigin.subPaths, lastSchemaAndPathsDest.path);
-						doc.markModified(lastSchemaAndPathsOrigin.subPaths[0]);
+						moveForAllSubArrays(doc, lastSchemaAndPathsOrigin.subPaths, lastSchemaAndPathsDest.path);
+						doc.markModified(lastSchemaAndPathsDest.subPaths[0]);
 
 						doc.save(function (err) {
 							if (err) reject(err);
@@ -130,7 +187,7 @@ function moveSchemaField(model, origin, dest) {
 
 							if (numUpdated == numToUpdate) {
 								removeSchemaField(model, origin)
-								.then(resolve("Field moved successfully"))
+								.then(() =>resolve("Field moved successfully"))
 								.catch(error => reject(error));
 							}
 						});
@@ -147,7 +204,7 @@ function moveSchemaField(model, origin, dest) {
  * 
  * @param {object} model The Mongoose model.
  * @param {string} path The path to the field whose definition will be changed (sucessive fields separated with points, 
- * even when a nested field is inside an array/subdocument). The path must point to an existing field.
+ * even when a nested field is inside an array). The path must point to an existing field.
  * @param {object} newDefinition The new definition of the field (same structure as standard Mongoose schema field 
  * definitions).
  * @returns {Promise.<string, string>} Results of the operation.
@@ -164,8 +221,9 @@ function changeFieldDefinition(model, path, newDefinition) {
 		objectPath.set(fieldDefinition, lastSchemaAndPaths.path, newDefinition);
 
 		removeSchemaField(model, path)
-		.then(result => addSchemaField(model, path, newDefinition))
-		.then(result => resolve("Field definition modified"))
+		.then(() => addSchemaField(model, path, newDefinition))
+		.then(() => updateDefaults (model, lastSchemaAndPaths.subPaths[0]))
+		.then(() => resolve("Field definition modified"))
 		.catch(error => reject(error));
 	});
 }
@@ -174,14 +232,18 @@ function changeFieldDefinition(model, path, newDefinition) {
  * Alternative function to change a field's type, more limited than changeFieldDefinition.
  * 
  * @param {object} model The Mongoose model.
- * @param {string} path The path of the field whose type will be changed (sucessive fields separated with points, even when a 
- * nested field is inside an array/subdocument).
+ * @param {string} path The path of the field whose type will be changed (sucessive fields separated with points, even 
+ * when a nested field is inside an array).
  * @param {object} newType The new type of the field (String, Number...).
- * @param {string} defaultValue The default value of the field. If undefined, no default value will be defined for the field.
+ * @param {string} defaultValue The default value of the field. If undefined, no default value will be defined for the 
+ * field.
  * @param {boolean} required If the field is required or not. If undefined, it will be tagged as not required.
+ * @param {boolean} keepValues Whether to keep the previous values of the field or not. Only mark it as true if changing
+ * between compatible types and values (eg. string and integer as long as all the values of that field in the existing 
+ * documents represent numbers).
  * @returns {Promise.<string, string>} Results of the operation.
  */
-function changeFieldType(model, path, newType, defaultValue, required) {
+function changeFieldType(model, path, newType, defaultValue, required = false, keepValues = false) {
 	return new Promise(function (resolve, reject) {
 		var lastSchemaAndPaths = getLastSchemaAndPaths(model.schema, path);
 
@@ -190,7 +252,8 @@ function changeFieldType(model, path, newType, defaultValue, required) {
 
 		var fieldDefinition = {};
 
-		objectPath.set (fieldDefinition, lastSchemaAndPaths.path, objectPath.get (lastSchemaAndPaths.schema.tree, lastSchemaAndPaths.path));
+		objectPath.set (fieldDefinition, lastSchemaAndPaths.path, 
+			objectPath.get (lastSchemaAndPaths.schema.tree, lastSchemaAndPaths.path));
 
 		var fieldDefinitionSuper = objectPath.get (fieldDefinition, lastSchemaAndPaths.path);
 		fieldDefinitionSuper.type = newType;
@@ -199,13 +262,30 @@ function changeFieldType(model, path, newType, defaultValue, required) {
 		else
 			delete fieldDefinitionSuper.default;
 
-		if (required != undefined)
+		if (required)
 			fieldDefinitionSuper.required = required;
 		else
 			delete fieldDefinitionSuper.required;
 		
 		lastSchemaAndPaths.schema.remove(lastSchemaAndPaths.path);
 		lastSchemaAndPaths.schema.add(fieldDefinition);
+
+		if (!keepValues) {
+			var update = {};
+				update[lastSchemaAndPaths.fullPath] = defaultValue;
+
+			var updateQuery = {};
+			if (lastSchemaAndPaths.pathToLast != "")
+				updateQuery[lastSchemaAndPaths.pathToLast] = { $gt: [] };
+
+			model.update(updateQuery, { $set: update }, { multi: true, upsert: false })
+			.then (() => resolve("Field type changed"))
+			.catch(error => reject(error));
+		} else {
+			updateDefaults (model, lastSchemaAndPaths.subPaths[0])
+			.then(() => resolve("Field type changed"))
+			.catch(error => reject(error));
+		}
 
 		resolve("Field type changed");
 	});
@@ -214,31 +294,31 @@ function changeFieldType(model, path, newType, defaultValue, required) {
 // Utilities
 
 /**
- * Moves the value of the fields at the end of the subPaths array to the field at lastDestPath in the same subdocument 
+ * Moves the value of the fields at the end of the subPaths array to the field at lastDestPath in the same array 
  * level, doing this for all instances of that field in the case it is contained inside one or multiple arrays.
  * 
  * @param {object} doc The document.
  * @param {string[]} subPaths Subpaths that point to the field whose value will be moved.
- * @param {string} lastDestPath Path inside the same subdocument level of the other field where the value will be moved.
+ * @param {string} lastDestPath Path inside the same array level of the other field where the value will be moved.
  */
-function moveForAllSubdocuments(doc, subPaths, lastDestPath) {
-	moveForAllSubdocumentsRecursive(doc, subPaths, lastDestPath, 0);
+function moveForAllSubArrays(doc, subPaths, lastDestPath) {
+	moveForAllSubArraysRecursive(doc, subPaths, lastDestPath, 0);
 }
 
 /**
- * Auxiliary function for moveForAllSubdocuments.
+ * Auxiliary function for moveForAllSubArrays.
  * 
  * @param {object} doc The document.
  * @param {string[]} subPaths Subpaths that point to the field whose value will be moved.
- * @param {string} lastDestPath Path inside the same subdocument level of the other field where the value will be moved.
- * @param {number} currentPathIndex The current index of the subdocument levels to explore.
+ * @param {string} lastDestPath Path inside the same array level of the other field where the value will be moved.
+ * @param {number} currentPathIndex The current index of the array levels to explore.
  */
 function moveForAllSubdocumentsRecursive(doc, subPaths, lastDestPath, currentPathIndex) {
 	if (currentPathIndex == (subPaths.length - 1)) {
 		objectPath.set(doc._doc, lastDestPath, objectPath.get(doc._doc, subPaths[currentPathIndex]))
 	} else {
 		objectPath.get(doc._doc, subPaths[currentPathIndex]).forEach(function (subDoc) {
-			moveForAllSubdocumentsRecursive(subDoc, subPaths, lastDestPath, currentPathIndex + 1);
+			moveForAllSubArraysRecursive(subDoc, subPaths, lastDestPath, currentPathIndex + 1);
 		});
 	}
 }
@@ -247,13 +327,13 @@ function moveForAllSubdocumentsRecursive(doc, subPaths, lastDestPath, currentPat
  * Returns an object containing useful information given an schema and a path. The fields contained are:
  * 
  * - exists: If the path points to an existing field.
- * - schema: The schema of the subdocument the path is pointing to.
- * - path: The path to the pointed location inside its own subdocument.
- * - pathToLastQuery: The path that points to the last array found, the subdocument level where the given path points to.
+ * - schema: The schema of the sub-array the path is pointing to.
+ * - path: The path to the pointed location inside its own array level.
+ * - fullPath: The fill path to the field pointed by the given path.
  *   A ".$[]" symbol is added in each array position so it to be used in queries (requires MongoDB 3.6+).
- * - pathToLast: The path that points to the last array found, the subdocument level where the given path points to.
+ * - pathToLast: Path that points to the last array where the field pointed by the given path is located.
  * - subPaths: Array of paths, where each subpath points to the next array or, for the last subpath, to the location the
- * given path points to inside its own subdocument.
+ * given path points to inside its own array.
  * 
  * @param {object} schema The schema to explore.
  * @param {string} path The path to the field.
@@ -266,18 +346,20 @@ function getLastSchemaAndPaths(schema, path) {
 /**
  * Auxiliary function for getLastSchemaAndPaths.
  * 
- * @param {object} schema The schema to explore.
+ * @param {object} currentSchema The schema currently being explored.
  * @param {string} path The path to the field.
  * @param {number} currentPathIndex The current index of the subpaths to explore.
- * @param {string} currentPathToLastQuery The current full path.
+ * @param {string} currentFullPath The current full path.
  * @param {array} subPaths The array of subpaths. 
  * @returns {object} Object containing all the utility data.
  */
-function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, currentPathToLastQuery, subPaths) {
+function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, currentFullPath, subPaths) {
 	var currentPath = path[currentPathIndex];
 
 	if (currentPathIndex != path.length) {
-		while ((currentSchema.path(currentPath) === undefined) || (currentSchema.path(currentPath).instance !== "Array")) {
+		while ((currentSchema.path(currentPath) === undefined) || 
+			(currentSchema.path(currentPath).instance !== "Array")) {
+
 			currentPathIndex++;
 
 			if (currentPathIndex == path.length)
@@ -288,9 +370,14 @@ function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, c
 		}
 	}
 
-	if ((currentSchema.path(currentPath) !== undefined) && (currentSchema.path(currentPath).instance === "Array") && (currentPathIndex < path.length - 1)) {
+	if ((currentSchema.path(currentPath) !== undefined) && 
+		(currentSchema.path(currentPath).instance === "Array") && 
+		(currentPathIndex < path.length - 1)) {
+
 		subPaths.push(currentPath);
-		return getLastSchemaAndPathsRecursive(currentSchema.path(currentPath).schema, path, currentPathIndex + 1, currentPath + ".$[]", subPaths);
+		return getLastSchemaAndPathsRecursive(currentSchema.path(currentPath).schema, path, 
+			currentPathIndex + 1, ((currentFullPath === "") ? currentPath : 
+			currentFullPath+".$[]."+currentPath), subPaths);
 	} else {
 		var exists;
 		if (objectPath.get(currentSchema.tree, currentPath) === undefined)
@@ -303,11 +390,42 @@ function getLastSchemaAndPathsRecursive(currentSchema, path, currentPathIndex, c
 			exists: exists, 
 			schema: currentSchema,
 			path: currentPath, 
-			pathToLastQuery: ((currentPathToLastQuery !== "") ? (currentPathToLastQuery + "." + currentPath) : currentPath), 
-			pathToLast: currentPathToLastQuery.replace(".$[]", ""), 
+			fullPath: ((currentFullPath === "") ? currentPath : (currentFullPath + ".$[]." + currentPath)), 
+			pathToLast: currentFullPath.replace(".$[]", ""), 
 			subPaths : subPaths
 		};
 	}
+}
+
+/**
+ * Updates the defaults values of the previously existing documents when necessary
+ * 
+ * @param {*} model The model.
+ * @param {*} path The path where the defaults will be updated.
+ */
+function updateDefaults (model, path) {
+	return new Promise(function (resolve, reject) {
+		model.find({}, function (err, docs) {
+			if (err) reject(err);
+			else {
+				var numToSave = docs.length;
+				var numSaved = 0;
+				docs.forEach(function (doc) {
+					doc.markModified(path);
+			
+					doc.save(function (err) {
+						if (err) reject(err);
+						else {
+							numSaved++;
+				
+							if (numSaved == numToSave)
+								resolve();
+						}
+					});
+				});
+			}
+		});
+	});
 }
 
 // Exports

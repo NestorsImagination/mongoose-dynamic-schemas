@@ -1,7 +1,12 @@
 # Mongoose Dynamic Schemas
+
 A lightweight module which allows to dynamically add, remove, move and redefine schema fields of [Mongoose](http://mongoosejs.com/) models. Useful when you need a model to be flexible but still want it to conform to a well defined schema.
 
-[![npm](https://img.shields.io/badge/npn-v1.1.2-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
+[![npm](https://img.shields.io/badge/npn-v1.2.0-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
+
+## Last improvements
+
+The module has been improved so now it is more robust. Now mongoose 'lean' queries are supported, as defaults are immediately applied to existing documents whenever the changes made to the schema require it.
 
 ## Requeriments
 
@@ -27,7 +32,7 @@ The main functions provided return [ES6 promises](https://developer.mozilla.org/
 
 ### Adding a field
 
-You can add a field with this function:
+To add a new field:
 
 ```javascript
 addSchemaField(model, path, fieldDefinition)
@@ -35,67 +40,88 @@ addSchemaField(model, path, fieldDefinition)
 
 Arguments:
 * model: The Mongoose model.
-* path (string): The path where the field will be added (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path can't point to an existing field.
-* fieldDefinition (object): The definition of the field to add, including options and other nested fields or arrays/subdocuments.
+* path (string): The path where the field will be added (sucessive fields separated with points, even when a nested field is inside an array). The path can't point to an existing field.
+* fieldDefinition (object): The definition of the field to add, including options and other nested fields or arrays.
 
 ### Removing a field
 
-You can remove a field with this function:
+To remove a field:
 
 ```javascript
-removeSchemaField(model, path)
+removeSchemaField(model, path, removeSubdocumentIfEmpty = false)
 ```
 
 Arguments:
 
 * model: The Mongoose model.
-* path (string): The path of the field to remove (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
+* path (string): The path of the field to remove (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
+* removeSubdocumentIfEmpty (boolean): Whether to remove the subdocument containing the field to remove if it gets empty (when applicable). For example, if you have the next structure:
+
+```javascript
+{
+  a : {
+    b : String
+  }
+}
+```
+
+And you remove 'a.b', if removeSubdocumentIfEmpty is false the next structure would remain:
+
+```javascript
+{
+  a : {}
+}
+```
+
+If removeSubdocumentIfEmpty is true, the field 'a' would be also removed.
  
 ### Moving or renaming a field
 
-You can move or rename a field with this function:
+To move or rename a field:
 
 ```javascript
-moveSchemaField(model, origin, dest)
+moveSchemaField(model, origin, dest, removeSubdocumentIfEmpty = false)
 ```
 
-The origin path must point to an existing field. The destination path must point to a non existing field in the same array/subdocument level of the field at the origin path. The new field will keep the values the original field had, even at subdocument levels.
+The origin path must point to an existing field. The destination path must point to a non existing field in the same array level of the field at the origin path. The new field will keep the values the original field had, even at sub-array levels.
 
 Arguments:
 
 * model: The Mongoose model.
-* origin (string): The path of the field to move (sucessive fields separated with points, even when a nested field is inside an array/subdocument). It must point to an existing field.
-* dest (string): The destination path of the field to move (sucessive fields separated with points, even when a nested field is inside an array/subdocument). It cannot point to an existing field.
+* origin (string): The path of the field to move (sucessive fields separated with points, even when a nested field is inside an array). It must point to an existing field.
+* dest (string): The destination path of the field to move (sucessive fields separated with points, even when a nested field is inside an array). It cannot point to an existing field.
+* removeSubdocumentIfEmpty (boolean): Same function as the field with the same name of the removeSchemaField method.
 
 ### Changing a field's definition
  
-You can change a field's definition with this function:
+To change a field's definition:
  
 ```javascript
-changeFieldDefinition(model, path, newDefinition)
+changeFieldDefinition(model, path, newDefinition, )
 ```
  
 Arguments:
 
 * model: The Mongoose model.
-* path (string): The path to the field whose definition will be changed (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
+* path (string): The path to the field whose definition will be changed (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
 * newDefinition (object): The new definition of the field (same structure as standard Mongoose schema field definitions).
 
 ### Changing a field's type
 
-An alternative function to changeFieldDefinition is provided in order to simplify its call, although its more limited:
+An alternative function to changeFieldDefinition:
 
 ```javascript
-changeFieldType(model, path, newType, defaultValue, required)
+changeFieldType(model, path, newType, defaultValue, required = false, keepValues = false)
 ```
 
 Arguments:
 
 * model: The Mongoose model.
-* path (string): The path to the field whose type will be changed (sucessive fields separated with points, even when a nested field is inside an array/subdocument). The path must point to an existing field.
+* path (string): The path to the field whose type will be changed (sucessive fields separated with points, even when a nested field is inside an array). The path must point to an existing field.
 * newType (Type): The new type of the field (String, Number...).
 * defaultValue: The default value of the field. If undefined, no default value will be defined for the field.
-* required: If the field is required or not. If undefined, it will be tagged as not required.
+* required: If the field is required or not.
+* keepValues: Whether to keep the previous values of the field or not. Only mark it as true if changing between compatible types and values (eg. string and integer as long as all the values of that field in the existing documents represent numbers).
 
 ## Example
 
@@ -333,7 +359,7 @@ Results:
 
 ### Moving fields
 
-Now we move some fields. Remember that you cannot move a field between different subdocuments. For example, if we have the next structure:
+Now we move some fields. Remember that you cannot move a field between different array levels. For example, if we have the next structure:
 
 ```javascript
 {a : 
@@ -547,42 +573,89 @@ Now that we have been modifying the model's schema over and over we may want to 
 The result is:
 
 ```
-{ name: { type: [Function: String], required: true, default: 'No name' },
-  _id:
-   { auto: true,
-     type: { [Function: ObjectId] schemaName: 'ObjectId' } },
+{ 
+  name: { 
+    type: [Function: String], 
+    required: true, 
+    default: 'No name' 
+  },
+  _id: { 
+    auto: true,
+    type: { 
+      [Function: ObjectId] schemaName: 'ObjectId' 
+    } 
+  },
   __v: [Function: Number],
-  id:
-   VirtualType {
-     path: 'id',
-     getters: [ [Function: idGetter] ],
-     setters: [],
-     options: {} },
-  family: { type: [Function: String], default: 'No family' },
+  id: VirtualType {
+    path: 'id',
+    getters: [ [Function: idGetter] ],
+    setters: [],
+    options: {} 
+  },
+  family: { 
+    type: [Function: String], 
+    default: 'No family' 
+  },
   stats: {},
-  familyDogs:
-   [ { meetings:
-        [ { mDate: { type: [Function: Date], default:
-[Function: now] },
-            time: { type: [Function: Number], default: 10 },
-            location: { type: [Function: Number], default: 2, required: true } } ],
-       something: { love: { type: [Function: Number],
-default: 0 } },
-       relation: { type: [Function: Boolean], default: true, required: true } } ],
-  looks:
-   { colour: { type: [Function: Number], default: 3, required: true } },
-  power: { type: [Function: Number], required: true, default: 50 },
+  familyDogs: [{ 
+    meetings: [{
+      mDate: { 
+        type: [Function: Date], 
+        default: [Function: now] 
+      },
+      time: { 
+        type: [Function: Number], 
+        default: 10 
+      },
+      location: { 
+        type: [Function: Number], 
+        default: 2, 
+        required: true 
+      } 
+    }],
+    something: { 
+      love: { 
+        type: [Function: Number],
+        default: 0 
+      } 
+    },
+    relation: { 
+      type: [Function: Boolean], 
+      default: true, 
+      required: true 
+    } 
+  }],
+  looks: { 
+    colour: { 
+      type: [Function: Number], 
+      default: 3, 
+      required: true 
+    } 
+  },
+  power: { 
+    type: [Function: Number], 
+    required: true, default: 50 
+  },
   age: { type: [Function: Number] },
-  breed:
-   { field1:
-      { type: [Function: String],
-        default: 'Pomerania',
-        required: true },
-     field2: { type: [Function: Number], default: 6, required: true } },
-  children: { type: [Function: Boolean], default: false, required: true } }
+  breed: { 
+    field1: { type: [Function: String],
+      default: 'Pomerania',
+      required: true 
+    },
+    field2: { 
+      type: [Function: Number], 
+      default: 6, required: true 
+    } 
+  },
+  children: { 
+    type: [Function: Boolean], 
+    default: false, 
+    required: true 
+  } 
+}
 ```
 
-We also print the schema for the 'familyDogs' subdocument:
+We also print the schema for the 'familyDogs' array:
 
 ```javascript
 .then(function() {console.log(util.inspect(Dog.schema.path("familyDogs").schema.tree, false, null))})
@@ -591,20 +664,42 @@ We also print the schema for the 'familyDogs' subdocument:
 The result is:
 
 ```
-{ _id:
-   { auto: true,
-     type: { [Function: ObjectId] schemaName: 'ObjectId' } },
+{
+  _id: {
+    auto: true,
+    type: { [Function: ObjectId] schemaName: 'ObjectId' } },
   id:
-   VirtualType {
-     path: 'id',
-     getters: [ [Function: idGetter] ],
-     setters: [],
-     options: {} },
-  meetings:
-   [ { mDate: { type: [Function: Date], default: [Function: now] },
-       time: { type: [Function: Number], default: 10 },
-       location: { type: [Function: Number], default:
-2, required: true } } ],
-  something: { love: { type: [Function: Number], default: 0 } },
-  relation: { type: [Function: Boolean], default: true, required: true } }
+    VirtualType {
+      path: 'id',
+      getters: [ [Function: idGetter] ],
+      setters: [],
+      options: {} 
+  },
+  meetings: [{ 
+    mDate: { 
+      type: [Function: Date], 
+      default: [Function: now] },
+      time: { 
+        type: [Function: Number], 
+        default: 10
+      },
+      location: { 
+        type: [Function: Number], 
+        default: 2, 
+        required: true 
+      } 
+    } 
+  ],
+  something: { 
+    love: { 
+      type: [Function: Number], 
+      default: 0 
+    } 
+  },
+  relation: { 
+    type: [Function: Boolean], 
+    default: true, 
+    required: true 
+  } 
+}
 ```
