@@ -63,7 +63,7 @@ function addSchemaAux(model, lastSchemaAndPaths, fieldDefinition) {
 		}
 
 		updateDefaults(model, lastSchemaAndPaths.subPaths[0])
-		.then(() => resolve("Field added successfully"))
+		.then(() => resolve())
 		.catch(error => reject(error));
 	});
 }
@@ -186,7 +186,7 @@ function moveSchemaField(model, origin, dest, removeSubdocumentIfEmpty = false) 
 							numUpdated++;
 
 							if (numUpdated == numToUpdate) {
-								removeSchemaField(model, origin)
+								removeSchemaField(model, origin, removeSubdocumentIfEmpty)
 								.then(() =>resolve("Field moved successfully"))
 								.catch(error => reject(error));
 							}

@@ -2,7 +2,7 @@
 
 A lightweight module which allows to dynamically add, remove, move and redefine schema fields of [Mongoose](http://mongoosejs.com/) models. Useful when you need a model to be flexible but still want it to conform to a well defined schema.
 
-[![npm](https://img.shields.io/badge/npn-v1.2.0-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
+[![npm](https://img.shields.io/badge/npn-v1.2.2-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
 
 ## Last improvements
 
