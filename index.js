@@ -313,7 +313,7 @@ function moveForAllSubArrays(doc, subPaths, lastDestPath) {
  * @param {string} lastDestPath Path inside the same array level of the other field where the value will be moved.
  * @param {number} currentPathIndex The current index of the array levels to explore.
  */
-function moveForAllSubdocumentsRecursive(doc, subPaths, lastDestPath, currentPathIndex) {
+function moveForAllSubArraysRecursive(doc, subPaths, lastDestPath, currentPathIndex) {
 	if (currentPathIndex == (subPaths.length - 1)) {
 		objectPath.set(doc._doc, lastDestPath, objectPath.get(doc._doc, subPaths[currentPathIndex]))
 	} else {
