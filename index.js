@@ -47,6 +47,13 @@ function addSchemaField(model, path, fieldDefinition) {
 	});
 }
 
+/**
+ * Auxiliary method for addSchemaField.
+ * 
+ * @param {object} model The Mongoose model.
+ * @param {object} lastSchemaAndPaths The variable with the same name from the main method
+ * @param {*} fieldDefinition The definition of the new field.
+ */
 function addSchemaAux(model, lastSchemaAndPaths, fieldDefinition) {
 	return new Promise(function (resolve, reject) {
 		var addQuery = {};
