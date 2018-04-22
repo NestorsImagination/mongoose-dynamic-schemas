@@ -182,23 +182,28 @@ function moveSchemaField(model, origin, dest, removeSubdocumentIfEmpty = false) 
 				.then(() => model.find({}).exec())
 				.then(docs => {
 					var numToUpdate = docs.length;
-					var numUpdated = 0;
 
-					docs.forEach(function (doc) {
-						moveForAllSubArrays(doc, lastSchemaAndPathsOrigin.subPaths, lastSchemaAndPathsDest.path);
-						doc.markModified(lastSchemaAndPathsDest.subPaths[0]);
+					if (numToUpdate == 0)
+						resolve("Field moved successfully")
+					else {
+						var numUpdated = 0;
 
-						doc.save(function (err) {
-							if (err) reject(err);
-							numUpdated++;
+						docs.forEach(function (doc) {
+							moveForAllSubArrays(doc, lastSchemaAndPathsOrigin.subPaths, lastSchemaAndPathsDest.path);
+							doc.markModified(lastSchemaAndPathsDest.subPaths[0]);
 
-							if (numUpdated == numToUpdate) {
-								removeSchemaField(model, origin, removeSubdocumentIfEmpty)
-								.then(() =>resolve("Field moved successfully"))
-								.catch(error => reject(error));
-							}
+							doc.save(function (err) {
+								if (err) reject(err);
+								numUpdated++;
+
+								if (numUpdated == numToUpdate) {
+									removeSchemaField(model, origin, removeSubdocumentIfEmpty)
+									.then(() =>resolve("Field moved successfully"))
+									.catch(error => reject(error));
+								}
+							});
 						});
-					});
+					}
 				})
 				.catch(error => reject(error));
 			}
@@ -416,20 +421,25 @@ function updateDefaults (model, path) {
 			if (err) reject(err);
 			else {
 				var numToSave = docs.length;
-				var numSaved = 0;
-				docs.forEach(function (doc) {
-					doc.markModified(path);
-			
-					doc.save(function (err) {
-						if (err) reject(err);
-						else {
-							numSaved++;
 				
-							if (numSaved == numToSave)
-								resolve();
-						}
+				if (numToSave == 0)
+					resolve();
+				else {
+					var numSaved = 0;
+					docs.forEach(function (doc) {
+						doc.markModified(path);
+				
+						doc.save(function (err) {
+							if (err) reject(err);
+							else {
+								numSaved++;
+					
+								if (numSaved == numToSave)
+									resolve();
+							}
+						});
 					});
-				});
+				}
 			}
 		});
 	});
