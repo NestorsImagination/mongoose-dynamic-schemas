@@ -8,11 +8,11 @@ A lightweight module which allows to dynamically add, remove, move and redefine 
 
 ## Last improvements
 
-The module has been improved so now it is more robust. Now mongoose 'lean' queries are supported, as defaults are immediately applied to existing documents whenever the changes made to the schema require it.
+The module has been improved to be more robust. Now mongoose 'lean' queries are supported, as defaults are immediately applied to existing documents whenever the changes made to the schema require it.
 
 ## Requeriments
 
-The MongoDB database version must be 3.6+ in order for this package to correctly work, as the '$[]' token is used in one of the queries. It could probably be adapted so it works with early versions.
+The MongoDB database version must be 3.6+ in order for this package to work correctly.
 
 ## Documentation
 
