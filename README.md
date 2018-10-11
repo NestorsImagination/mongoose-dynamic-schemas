@@ -4,7 +4,7 @@ A lightweight module which allows to dynamically add, remove, move and redefine 
 
 [Test this module online (requires a MongoDB 3.6+ instance)](https://runkit.com/nestorsimagination/5adbcb05fbdb760012439c5b)
 
-[![npm](https://img.shields.io/badge/npn-v1.2.5-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
+[![npm](https://img.shields.io/badge/npn-v1.2.6-brightgreen.svg)](https://www.npmjs.com/package/mongoose-dynamic-schemas)
 
 ## Last improvements
 
